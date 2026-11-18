@@ -72,7 +72,7 @@ bun check
 
 **Resultado esperado.** La última línea trae una marca de verificación y anuncia que no hay errores de tipos en los cuatro archivos del código: el ejecutor, las dos aplicaciones y el bloqueo. Los archivos `.sql` no se revisan. Sin el `tsconfig.json` y sin los tipos de Bun, el editor marca errores en las importaciones.
 
-Bun imprime la orden que ejecuta, precedida de `$`, antes de la salida del programa. Cuando un programa termina con error, agrega al final una línea `error: script "..." exited with code 1`. Esas dos líneas no son del programa y no cuentan al comparar resultados.
+Bun imprime la orden que ejecuta, precedida de `$`, y la reescribe con sus propias comillas. Cuando un programa termina con error, agrega al final una línea `error: script "..." exited with code 1`. Esas dos líneas no son del programa y no cuentan al comparar resultados.
 
 Van a necesitar tres terminales, todas abiertas en la carpeta del repositorio: la primera para la aplicación vieja, la segunda para la aplicación nueva y la tercera para las sentencias de `db/`. Desde el gestor de archivos, el botón derecho sobre la carpeta ofrece abrir una terminal. También sirve la del editor que usen.
 
@@ -116,7 +116,7 @@ El resto del archivo inserta 500 clientes y 50.000 pedidos con una consulta recu
 bun sql db/semilla.sql
 ```
 
-**Resultado esperado.** Primero una tabla de una línea con el modo de registro: `wal`. Después, cinco líneas `ok`, una por cada sentencia de estructura: tres borrados y dos creaciones. A continuación, tres conteos: 500 filas, 50000 filas y 3 filas. Son los clientes, los pedidos y los pedidos que apuntan al cliente 9999. Al final, dos tablas de dos columnas con el nombre de cada tabla y su cantidad de filas.
+**Resultado esperado.** Primero una tabla de una línea con el modo de registro: `wal`. Después, cinco líneas `ok`, una por cada sentencia de estructura: tres borrados y dos creaciones. A continuación, tres líneas con las filas que tocó cada escritura: 500 clientes insertados, 50000 pedidos insertados y 3 pedidos cambiados para que apunten al cliente 9999. Al final, dos tablas de dos columnas con el nombre de cada tabla y su cantidad de filas.
 
 Si en algún momento la base de datos queda a medias, detengan las dos aplicaciones y ejecuten el archivo otra vez. El archivo borra las tres tablas antes de crearlas, así que la base vuelve al estado inicial.
 
@@ -235,6 +235,15 @@ Las dos aplicaciones están en línea al mismo tiempo y escriben sobre la misma 
 ```sql
 BEGIN IMMEDIATE;
 
+CREATE TABLE IF NOT EXISTS migraciones (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  paso TEXT NOT NULL,
+  desde INTEGER NOT NULL,
+  hasta INTEGER NOT NULL,
+  filas INTEGER NOT NULL,
+  terminado_en TEXT NOT NULL
+);
+
 INSERT INTO migraciones (paso, desde, hasta, filas, terminado_en)
 SELECT 'relleno', ?1, ?2, COUNT(*), datetime('now')
 FROM pedidos
@@ -250,8 +259,9 @@ COMMIT;
 **Qué hace cada línea**
 
 - `BEGIN IMMEDIATE` abre la transacción y pide el bloqueo de escritura de entrada, no en la primera escritura.
+- `CREATE TABLE IF NOT EXISTS` crea el punto de control la primera vez y no hace nada en los lotes siguientes.
 - El `INSERT` no guarda pedidos: anota el lote en el punto de control.
-- `?1` y `?2` son el inicio y el final del rango. El inicio queda afuera y el final entra: `0 10000` rellena los pedidos 1 a 10000.
+- `?1` y `?2` son el inicio y el final del rango, separados por un espacio en la línea de comandos. El inicio queda afuera y el final entra: `0 10000` rellena los pedidos 1 a 10000.
 - `COUNT(*)` cuenta las filas antes de tocarlas.
 - El `UPDATE` copia `cliente_id` en `cliente_principal_id`.
 - `IS NULL` limita el trabajo a las filas que todavía no tienen valor nuevo.
@@ -274,7 +284,7 @@ bun sql db/paso-3-relleno.sql 30000 40000
 bun sql db/paso-3-relleno.sql 40000 50000
 ```
 
-**Resultado esperado en cada lote.** Tres líneas. La primera es `ok`, siempre: el archivo crea la tabla del punto de control si falta y la deja como está si ya existe. La segunda dice `1 fila`: el lote quedó anotado. La tercera dice `10000 filas`: es el número de pedidos rellenados. La confirmación de la transacción no imprime nada.
+**Resultado esperado en cada lote.** Tres líneas. La primera es `ok`: el archivo crea la tabla del punto de control si falta y la deja como está si ya existe. La segunda dice `1 fila`: el lote quedó anotado. La tercera dice `10000 filas`: es el número de pedidos rellenados. La confirmación de la transacción no imprime nada.
 
 Repitan un lote que ya se ejecutó:
 
@@ -336,6 +346,7 @@ WHERE id <= 50000
 SELECT 'Control 3: filas huérfanas en la columna vieja' AS control, COUNT(*) AS valor
 FROM pedidos
 WHERE id <= 50000
+  AND cliente_id IS NOT NULL
   AND cliente_id NOT IN (SELECT id FROM clientes);
 ```
 
@@ -344,6 +355,7 @@ WHERE id <= 50000
 - La primera consulta cuenta las filas del rango que quedaron sin valor nuevo.
 - La segunda cuenta las filas cuyo valor nuevo apunta a un cliente que no existe.
 - `NOT IN` compara el valor con el conjunto de identificadores que sí existen.
+- `IS NOT NULL` deja fuera las filas sin valor: una fila sin valor no apunta a ningún cliente y no es huérfana.
 - La tercera consulta hace lo mismo con la columna vieja. Es la línea de base: dice cuántas filas huérfanas había antes de migrar.
 
 **Preguntas**
@@ -406,7 +418,7 @@ COMMIT;
 
 **Qué hace cada línea**
 
-- El primer `UPDATE` es el segundo relleno. Toma solo las filas fuera del rango inicial: las que escribió la aplicación vieja mientras se migraba.
+- El primer `UPDATE` es el segundo relleno. Toma las filas que quedaron fuera del primer relleno: todas las que escribió la aplicación vieja desde que arrancó, sin valor nuevo.
 - `id > 50000` separa lo nuevo de lo que ya se rellenó.
 - `DROP COLUMN` borra la columna vieja. La tabla se reescribe entera, así que esta sentencia sí toca las filas.
 - Las dos sentencias van en la misma transacción: o se rellena y se borra, o no pasa nada.
