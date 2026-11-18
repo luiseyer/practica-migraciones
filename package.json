@@ -1,0 +1,18 @@
+{
+	"name": "practica-migracion",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"sql": "bun src/sql.ts",
+		"v1": "bun src/app-v1.ts",
+		"v2": "bun src/app-v2.ts",
+		"bloqueo": "bun src/bloqueo.ts",
+		"check": "bun check"
+	},
+	"devDependencies": {
+		"@types/bun": "1.4.4"
+	},
+	"engines": {
+		"bun": ">=1.4.4"
+	}
+}
