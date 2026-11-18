@@ -22,6 +22,7 @@ WHERE id <= 50000
 SELECT 'Control 3: filas huérfanas en la columna vieja' AS control, COUNT(*) AS valor
 FROM pedidos
 WHERE id <= 50000
+  AND cliente_id IS NOT NULL
   AND cliente_id NOT IN (SELECT id FROM clientes);
 
 -- Control 4: muestra de diez filas, para comparar las dos columnas.

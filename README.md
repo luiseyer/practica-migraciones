@@ -7,7 +7,7 @@
 **Ingeniería de Sistemas - 7mo semestre**\
 **Asignatura:** Implantación de Sistemas\
 **Docente:** Ing. Luis Fernando Reyes\
-**Modalidad:** práctica guiada. Cada paso trae la sentencia, la lectura de cada línea y las preguntas que hay que responder antes de ejecutarla.
+**Modalidad:** práctica guiada. Cada paso trae lo que se ejecuta, la lectura de cada línea y las preguntas que hay que responder antes de ejecutarlo.
 
 <br clear="all" />
 
@@ -71,7 +71,9 @@ bun check
 
 **Resultado esperado.** Una sola línea, con una marca de verificación, que anuncia que no hay errores de tipos en los cuatro archivos del código: el ejecutor, las dos aplicaciones y el bloqueo. Los archivos `.sql` no se revisan. Sin el `tsconfig.json` y sin los tipos de Bun, el editor marca errores en las importaciones.
 
-Van a necesitar dos terminales a la vez, una para cada aplicación, y las dos abiertas en la carpeta del repositorio. Desde el gestor de archivos, el botón derecho sobre la carpeta ofrece abrir una terminal. También sirve la del editor que usen.
+Bun imprime la orden que ejecuta, precedida de `$`, antes de la salida del programa. Cuando un programa termina con error, agrega al final una línea `error: script "..." exited with code 1`. Esas dos líneas no son del programa y no cuentan al comparar resultados.
+
+Van a necesitar tres terminales, todas abiertas en la carpeta del repositorio: la primera para la aplicación vieja, la segunda para la aplicación nueva y la tercera para las sentencias de `db/`. Desde el gestor de archivos, el botón derecho sobre la carpeta ofrece abrir una terminal. También sirve la del editor que usen.
 
 ## Preparación: la base de datos
 
@@ -202,7 +204,7 @@ bun sql db/muestra.sql
 
 **Preguntas**
 
-1. La fila 50001 la escribió la aplicación vieja después de expandir. ¿Por qué tiene la columna nueva vacía?
+1. La fila de arriba la escribió la aplicación vieja después de expandir. ¿Por qué tiene la columna nueva vacía?
 2. ¿Qué pasaría si el relleno se hiciera antes de este paso?
 
 ## Paso 2: doble escritura
@@ -271,7 +273,7 @@ bun sql db/paso-3-relleno.sql 30000 40000
 bun sql db/paso-3-relleno.sql 40000 50000
 ```
 
-**Resultado esperado en cada lote.** Tres líneas. La primera es `ok`: se creó el punto de control si todavía no existía. La segunda dice `1 fila`: el lote quedó anotado. La tercera dice `10000 filas`: es el número de pedidos rellenados. La confirmación de la transacción no imprime nada.
+**Resultado esperado en cada lote.** Tres líneas. La primera es `ok`, siempre: el archivo crea la tabla del punto de control si falta y la deja como está si ya existe. La segunda dice `1 fila`: el lote quedó anotado. La tercera dice `10000 filas`: es el número de pedidos rellenados. La confirmación de la transacción no imprime nada.
 
 Repitan un lote que ya se ejecutó:
 
@@ -289,7 +291,7 @@ bun sql db/paso-3-relleno.sql 0 10000
 
 ### Opcional: ver la espera de bloqueo
 
-En la segunda terminal:
+Este tramo necesita dos terminales libres. Detengan la aplicación nueva con `Ctrl-C` y usen su terminal para el bloqueo:
 
 ```bash
 bun bloqueo
@@ -297,13 +299,19 @@ bun bloqueo
 
 **Resultado esperado.** Una línea que anuncia que el bloqueo está tomado y que dura doce segundos. La terminal queda ocupada hasta que el programa termina.
 
-En la otra terminal, mientras dura el bloqueo:
+En la tercera terminal, mientras dura el bloqueo:
 
 ```bash
 bun sql db/paso-3-relleno.sql 0 10000
 ```
 
 **Resultado esperado.** Una línea que empieza con `se cayó` y nombra el error del motor, `database is locked`. Al final, entre paréntesis, los milisegundos que esperó: alrededor de 3000.
+
+Después del tramo, vuelvan a desplegar la aplicación nueva:
+
+```bash
+bun v2
+```
 
 **Preguntas**
 
@@ -349,7 +357,7 @@ WHERE id <= 50000
 bun sql db/controles.sql
 ```
 
-**Resultado esperado.** Seis tablas, una por consulta, con el nombre del control en la primera columna y el valor en la segunda. Los valores que importan: 50000 filas en el rango, 229700000 como suma de los montos, 0 filas sin rellenar, 3 filas huérfanas en la columna nueva y 3 en la columna vieja. La última tabla trae diez filas de pedidos, elegidas al azar en cada ejecución, con el mismo valor en las dos columnas.
+**Resultado esperado.** Seis tablas, una por consulta. En las cinco primeras, la primera columna dice el nombre del control y la segunda el valor. La última trae diez filas de pedidos, elegidas al azar en cada ejecución, con el identificador y las dos columnas de cliente. Los valores que importan: 50000 filas en el rango, 229700000 como suma de los montos, 0 filas sin rellenar, 3 filas huérfanas en la columna nueva y 3 en la columna vieja. En la última, `cliente_id` y `cliente_principal_id` tienen el mismo valor en cada fila.
 
 | Control | Qué comprueba | Criterio |
 | --- | --- | --- |
@@ -410,7 +418,7 @@ COMMIT;
 
 **Ejecuten y comparen**
 
-Primero detengan la aplicación vieja con `Ctrl-C`. La terminal muestra `v1 detenida`.
+Primero detengan la aplicación vieja con `Ctrl-C`. La terminal muestra `v1 detenida`. La aplicación nueva sigue en línea.
 
 ```bash
 bun sql db/paso-5-contraer.sql
