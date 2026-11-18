@@ -18,7 +18,7 @@
 - La tabla `pedidos` tiene la columna nueva y ya no tiene la columna vieja.
 - Las 50.000 filas del rango quedaron con el valor nuevo, sin valores vacíos.
 - La aplicación vieja ya no arranca y la aplicación nueva sigue escribiendo.
-- La validación tiene un veredicto: aceptar con una excepción documentada.
+- La validación tiene un veredicto justificado con los cuatro controles.
 
 ## Qué contiene
 
@@ -37,6 +37,7 @@
 - `paso-3-relleno.sql`: rellena un lote y anota el punto de control.
 - `controles.sql`: los cuatro controles de validación.
 - `paso-5-contraer.sql`: segundo relleno y borrado de la columna vieja.
+- `esquema.sql`: las columnas que tiene `pedidos` en ese momento.
 
 La base de datos se crea en la raíz del repositorio, en `pedidos.db`. No se sube al repositorio.
 
@@ -69,7 +70,7 @@ bun install
 bun check
 ```
 
-**Resultado esperado.** Una sola línea, con una marca de verificación, que anuncia que no hay errores de tipos en los cuatro archivos del código: el ejecutor, las dos aplicaciones y el bloqueo. Los archivos `.sql` no se revisan. Sin el `tsconfig.json` y sin los tipos de Bun, el editor marca errores en las importaciones.
+**Resultado esperado.** La última línea trae una marca de verificación y anuncia que no hay errores de tipos en los cuatro archivos del código: el ejecutor, las dos aplicaciones y el bloqueo. Los archivos `.sql` no se revisan. Sin el `tsconfig.json` y sin los tipos de Bun, el editor marca errores en las importaciones.
 
 Bun imprime la orden que ejecuta, precedida de `$`, antes de la salida del programa. Cuando un programa termina con error, agrega al final una línea `error: script "..." exited with code 1`. Esas dos líneas no son del programa y no cuentan al comparar resultados.
 
@@ -217,7 +218,7 @@ En la segunda terminal:
 bun v2
 ```
 
-**Resultado esperado.** Una línea de arranque que anuncia que escribe en las dos columnas y lee la columna vieja. Después, una línea cada dos segundos, igual que la de la aplicación vieja pero con el nombre `cliente_id` delante del valor leído. La aplicación nueva inserta aunque la vieja esté escribiendo.
+**Resultado esperado.** Una línea de arranque que anuncia que escribe en las dos columnas y lee la columna vieja. Después, una línea cada dos segundos, igual que la de la aplicación vieja pero con el nombre `cliente_id` delante del valor leído. La aplicación nueva inserta aunque la vieja esté escribiendo, así que el número del pedido salta a veces de dos en dos.
 
 **Preguntas**
 
@@ -250,7 +251,7 @@ COMMIT;
 
 - `BEGIN IMMEDIATE` abre la transacción y pide el bloqueo de escritura de entrada, no en la primera escritura.
 - El `INSERT` no guarda pedidos: anota el lote en el punto de control.
-- `?1` y `?2` son los dos números que recibe el archivo: el inicio y el final del rango.
+- `?1` y `?2` son el inicio y el final del rango. El inicio queda afuera y el final entra: `0 10000` rellena los pedidos 1 a 10000.
 - `COUNT(*)` cuenta las filas antes de tocarlas.
 - El `UPDATE` copia `cliente_id` en `cliente_principal_id`.
 - `IS NULL` limita el trabajo a las filas que todavía no tienen valor nuevo.
@@ -297,9 +298,9 @@ Este tramo necesita dos terminales libres. Detengan la aplicación nueva con `Ct
 bun bloqueo
 ```
 
-**Resultado esperado.** Una línea que anuncia que el bloqueo está tomado y que dura doce segundos. La terminal queda ocupada hasta que el programa termina.
+**Resultado esperado.** Dos líneas separadas por doce segundos: la primera anuncia que el bloqueo está tomado y la segunda que se liberó. La terminal queda ocupada hasta el final.
 
-En la tercera terminal, mientras dura el bloqueo:
+El bloqueo dura doce segundos contados desde la primera línea. En la tercera terminal, lancen el relleno en cuanto la vean:
 
 ```bash
 bun sql db/paso-3-relleno.sql 0 10000
@@ -357,7 +358,7 @@ WHERE id <= 50000
 bun sql db/controles.sql
 ```
 
-**Resultado esperado.** Seis tablas, una por consulta. En las cinco primeras, la primera columna dice el nombre del control y la segunda el valor. La última trae diez filas de pedidos, elegidas al azar en cada ejecución, con el identificador y las dos columnas de cliente. Los valores que importan: 50000 filas en el rango, 229700000 como suma de los montos, 0 filas sin rellenar, 3 filas huérfanas en la columna nueva y 3 en la columna vieja. En la última, `cliente_id` y `cliente_principal_id` tienen el mismo valor en cada fila.
+**Resultado esperado.** Seis tablas, una por cada consulta del archivo. El control 3 ocupa tres, porque cuenta tres cosas distintas: las filas sin rellenar, las huérfanas en la columna nueva y las huérfanas en la columna vieja. En las cinco primeras, la primera columna dice el nombre del control y la segunda el valor. La sexta trae diez filas de pedidos, elegidas al azar en cada ejecución, con la etiqueta, el identificador y las dos columnas de cliente. Los valores que importan: 50000 filas en el rango, 229700000 como suma de los montos, 0 filas sin rellenar, 3 filas huérfanas en la columna nueva y 3 en la columna vieja. En la última, `cliente_id` y `cliente_principal_id` tienen el mismo valor en cada fila.
 
 | Control | Qué comprueba | Criterio |
 | --- | --- | --- |
@@ -433,6 +434,14 @@ bun v1
 ```
 
 **Resultado esperado.** Una línea con el nombre de la aplicación y el error del motor: `no such column: cliente_id`. La aplicación vieja no puede arrancar. La aplicación nueva sigue en línea y la secuencia terminó.
+
+Comprueben el esquema final:
+
+```bash
+bun sql db/esquema.sql
+```
+
+**Resultado esperado.** Una tabla con una fila por columna y su tipo. Quedan tres: `id`, `monto` y `cliente_principal_id`. `cliente_id` ya no aparece.
 
 ## Preguntas de salida
 

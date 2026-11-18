@@ -29,13 +29,14 @@ const sentencias = texto
   .filter((sentencia) => sentencia.length > 0);
 
 for (const sentencia of sentencias) {
-  const consulta = db.query<
-    Record<string, unknown>,
-    (string | number)[]
-  >(sentencia);
   const inicio = performance.now();
 
   try {
+    const consulta = db.query<
+      Record<string, unknown>,
+      (string | number)[]
+    >(sentencia);
+
     if (consulta.reader) {
       console.log(tabla(consulta.all(...valores)));
       continue;
